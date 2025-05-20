@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hangman Game</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        .game-container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            width: 90%;
+            max-width: 600px;
+            text-align: center;
+        }
+        
+        .hangman-display {
+            margin: 20px auto;
+            height: 200px;
+            position: relative;
+        }
+        
+        .word-display {
+            font-size: 2rem;
+            letter-spacing: 10px;
+            margin: 20px 0;
+            min-height: 50px;
+        }
+        
+        .keyboard {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 5px;
+            margin: 20px 0;
+        }
+        
+        .key {
+            width: 40px;
+            height: 40px;
+            background-color: #e0e0e0;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .key:hover {
+            background-color: #d0d0d0;
+        }
+        
+        .key.used {
+            background-color: #a0a0a0;
+            color: white;
+            cursor: not-allowed;
+        }
+        
+        .key.correct {
+            background-color: #4caf50;
+            color: white;
+        }
+        
+        .key.wrong {
+            background-color: #f44336;
+            color: white;
+        }
+        
+        .message {
+            font-size: 1.2rem;
+            margin: 10px 0;
+            min-height: 30px;
+            color: #333;
+        }
+        
+        .controls {
+            margin-top: 20px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background-color: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.2s;
+        }
+        
+        button:hover {
+            background-color: #0b7dda;
+        }
+        
+        .hint-btn {
+            background-color: #ff9800;
+            margin-right: 10px;
+        }
+        
+        .hint-btn:hover {
+            background-color: #e68a00;
+        }
+        
+        .difficulty {
+            margin-bottom: 20px;
+        }
+        
+        .difficulty button {
+            background-color: #9e9e9e;
+            margin: 0 5px;
+        }
+        
+        .difficulty button.active {
+            background-color: #2196f3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Hangman Game</h1>
+    
+    <div class="game-container">
+        <div class="difficulty">
+            <p>Select difficulty:</p>
+            <button id="easy-btn" class="active">Easy</button>
+            <button id="medium-btn">Medium</button>
+            <button id="hard-btn">Hard</button>
+        </div>
+        
+        <div class="hangman-display" id="hangman-drawing">
+            <!-- Hangman drawing will be rendered here -->
+        </div>
+        
+        <div class="word-display" id="word-display">
+            <!-- Word will be displayed here -->
+        </div>
+        
+        <div class="message" id="message">
+            <!-- Game messages will appear here -->
+        </div>
+        
+        <div class="keyboard" id="keyboard">
+            <!-- Keyboard will be generated here -->
+        </div>
+        
+        <div class="controls">
+            <button class="hint-btn" id="hint-btn">Hint</button>
+            <button id="reset-btn">New Game</button>
+        </div>
+    </div>
+
+    <script>
+        // Game state
+        let word = '';
+        let guessedLetters = [];
+        let wrongGuesses = 0;
+        const maxWrongGuesses = 6;
+        let difficulty = 'easy';
+        let gameOver = false;
+        
+        // Word banks by difficulty
+        const wordBank = {
+            easy: ['apple', 'house', 'happy', 'water', 'music', 'pizza', 'tiger', 'beach', 'smile', 'light'],
+            medium: ['elephant', 'mountain', 'adventure', 'keyboard', 'sunshine', 'butterfly', 'chocolate', 'dinosaur', 'umbrella', 'watermelon'],
+            hard: ['extravaganza', 'pseudopodia', 'xylophone', 'idiosyncracy', 'zephyr', 'idigenous', 'paradoxical', 'rhythm', 'subconscious', 'whimsical']
+        };
+        
+        // Hangman drawing parts
+        const hangmanParts = [
+            // Base
+            () => {
+                const canvas = document.getElementById('hangman-drawing');
+                const base = document.createElement('div');
+                base.style.position = 'absolute';
+                base.style.bottom = '0';
+                base.style.left = '50%';
+                base.style.transform = 'translateX(-50%)';
+                base.style.width = '100px';
+                base.style.height = '10px';
+                base.style.backgroundColor = '#333';
+                canvas.appendChild(base);
+            },
+            // Pole
+            () => {
+                const canvas = document.getElementById('hangman-drawing');
+                const pole = document.createElement('div');
+                pole.style.position = 'absolute';
+                pole.style.bottom = '10px';
+                pole.style.left = '50%';
+                pole.style.transform = 'translateX(-50%)';
+                pole.style.width = '10px';
+                pole.style.height = '150px';
+                pole.style.backgroundColor = '#333';
+                canvas.appendChild(pole);
+            },
+            // Top bar
+            () => {
+                const canvas = document.getElementById('hangman-drawing');
+                const topBar = document.createElement('div');
+                topBar.style.position = 'absolute';
+                topBar.style.top = '0';
+                topBar.style.left = '50%';
+                topBar.style.width = '80px';
+                topBar.style.height = '10px';
+                topBar.style.backgroundColor = '#333';
+                canvas.appendChild(topBar);
+            },
+            // Rope
+            () => {
+                const canvas = document.getElementById('hangman-drawing');
+                const rope = document.createElement('div');
+                rope.style.position = 'absolute';
+                rope.style.top = '10px';
+                rope.style.left = 'calc(50% + 70px)';
+                rope.style.width = '5px';
+                rope.style.height = '30px';
+                rope.style.backgroundColor = '#8b4513';
+                canvas.appendChild(rope);
+            },
+            // Head
+            () => {
+                const canvas = document.getElementById('hangman-drawing');
+                const head = document.createElement('div');
+                head.style.position = 'absolute';
+                head.style.top = '40px';
+                head.style.left = 'calc(50% + 60px)';
+                head.style.width = '30px';
+                head.style.height = '30px';
+                head.style.borderRadius = '50%';
+                head.style.border = '5px solid #333';
+                canvas.appendChild(head);
+            },
+            // Body
+            () => {
+                const canvas = document.getElementById('hangman-drawing');
+                const body = document.createElement('div');
+                body.style.position = 'absolute';
+                body.style.top = '70px';
+                body.style.left = 'calc(50% + 72px)';
+                body.style.width = '6px';
+                body.style.height = '60px';
+                body.style.backgroundColor = '#333';
+                canvas.appendChild(body);
+            },
+            // Left arm
+            () => {
+                const canvas = document.getElementById('hangman-drawing');
+                const arm = document.createElement('div');
+                arm.style.position = 'absolute';
+                arm.style.top = '80px';
+                arm.style.left = 'calc(50% + 50px)';
+                arm.style.width = '30px';
+                arm.style.height = '6px';
+                arm.style.backgroundColor = '#333';
+                arm.style.transform = 'rotate(30deg)';
+                canvas.appendChild(arm);
+            },
+            // Right arm
+            () => {
+                const canvas = document.getElementById('hangman-drawing');
+                const arm = document.createElement('div');
+                arm.style.position = 'absolute';
+                arm.style.top = '80px';
+                arm.style.left = 'calc(50% + 72px)';
+                arm.style.width = '30px';
+                arm.style.height = '6px';
+                arm.style.backgroundColor = '#333';
+                arm.style.transform = 'rotate(-30deg)';
+                canvas.appendChild(arm);
+            },
+            // Left leg
+            () => {
+                const canvas = document.getElementById('hangman-drawing');
+                const leg = document.createElement('div');
+                leg.style.position = 'absolute';
+                leg.style.top = '130px';
+                leg.style.left = 'calc(50% + 60px)';
+                leg.style.width = '6px';
+                leg.style.height = '30px';
+                leg.style.backgroundColor = '#333';
+                leg.style.transform = 'rotate(30deg)';
+                canvas.appendChild(leg);
+            },
+            // Right leg
+            () => {
+                const canvas = document.getElementById('hangman-drawing');
+                const leg = document.createElement('div');
+                leg.style.position = 'absolute';
+                leg.style.top = '130px';
+                leg.style.left = 'calc(50% + 72px)';
+                leg.style.width = '6px';
+                leg.style.height = '30px';
+                leg.style.backgroundColor = '#333';
+                leg.style.transform = 'rotate(-30deg)';
+                canvas.appendChild(leg);
+            }
+        ]
+        
+        // Initialize the game
+        function initGame() {
+            // Clear previous game state
+            document.getElementById('hangman-drawing').innerHTML = '';
+            document.getElementById('word-display').textContent = '';
+            document.getElementById('message').textContent = '';
+            document.getElementById('keyboard').innerHTML = '';
+            
+            // Reset game state
+            guessedLetters = [];
+            wrongGuesses = 0;
+            gameOver = false;
+            
+            // Select a random word based on difficulty
+            const words = wordBank[difficulty];
+            word = words[Math.floor(Math.random() * words.length)].toUpperCase();
+            
+            // Generate keyboard
+            generateKeyboard();
+            
+            // Update word display
+            updateWordDisplay();
+            
+            // Update message
+            document.getElementById('message').textContent = 'Guess a letter!';
+        }
+        
+        // Generate the keyboard
+        function generateKeyboard() {
+            const keyboard = document.getElementById('keyboard');
+            keyboard.innerHTML = '';
+            
+            // Create buttons for each letter A-Z
+            for (let i = 65; i <= 90; i++) {
+                const letter = String.fromCharCode(i);
+                const button = document.createElement('button');
+                button.textContent = letter;
+                button.className = 'key';
+                button.id = `key-${letter}`;
+                button.addEventListener('click', () => handleGuess(letter));
+                keyboard.appendChild(button);
+            }
+        }
+        
+        // Update the word display with underscores and guessed letters
+        function updateWordDisplay() {
+            const wordDisplay = document.getElementById('word-display');
+            let displayText = '';
+            
+            for (const letter of word) {
+                if (guessedLetters.includes(letter)) {
+                    displayText += letter + ' ';
+                } else {
+                    displayText += '_ ';
+                }
+            }
+            
+            wordDisplay.textContent = displayText.trim();
+            
+            // Check if player has won
+            if (!wordDisplay.textContent.includes('_')) {
+                gameOver = true;
+                document.getElementById('message').textContent = 'Congratulations! You won!';
+                disableAllKeys();
+            }
+        }
+        
+        // Handle a letter guess
+        function handleGuess(letter) {
+            if (gameOver) return;
+            
+            // Check if letter was already guessed
+            if (guessedLetters.includes(letter)) {
+                document.getElementById('message').textContent = 'You already guessed that letter!';
+                return;
+            }
+            
+            // Add letter to guessed letters
+            guessedLetters.push(letter);
+            const keyElement = document.getElementById(`key-${letter}`);
+            
+            // Check if letter is in the word
+            if (word.includes(letter)) {
+                keyElement.className = 'key correct';
+                document.getElementById('message').textContent = 'Correct!';
+            } else {
+                keyElement.className = 'key wrong';
+                document.getElementById('message').textContent = 'Wrong guess!';
+                wrongGuesses++;
+                drawHangman();
+                
+                // Check if player has lost
+                if (wrongGuesses >= maxWrongGuesses) {
+                    gameOver = true;
+                    document.getElementById('message').textContent = `Game Over! The word was: ${word}`;
+                    disableAllKeys();
+                }
+            }
+            
+            // Update word display
+            updateWordDisplay();
+        }
+        
+        // Draw the hangman based on wrong guesses
+        function drawHangman() {
+            // Only draw up to the current number of wrong guesses
+            for (let i = 0; i < wrongGuesses; i++) {
+                if (i < hangmanParts.length) {
+                    hangmanParts[i]();
+                }
+            }
+        }
+        
+        // Disable all keyboard keys
+        function disableAllKeys() {
+            const keys = document.querySelectorAll('.key');
+            keys.forEach(key => {
+                key.disabled = true;
+                key.className = 'key used';
+            });
+        }
+        
+        // Provide a hint
+        function provideHint() {
+            if (gameOver) return;
+            
+            // Find letters that haven't been guessed yet
+            const unguessedLetters = [];
+            for (const letter of word) {
+                if (!guessedLetters.includes(letter) && !unguessedLetters.includes(letter)) {
+                    unguessedLetters.push(letter);
+                }
+            }
+            
+            if (unguessedLetters.length > 0) {
+                // Pick a random unguessed letter to reveal
+                const hintLetter = unguessedLetters[Math.floor(Math.random() * unguessedLetters.length)];
+                handleGuess(hintLetter);
+                
+                // Disable the hint button after use
+                document.getElementById('hint-btn').disabled = true;
+                document.getElementById('message').textContent = `Hint: ${hintLetter} was revealed!`;
+            }
+        }
+        
+        // Set difficulty
+        function setDifficulty(newDifficulty) {
+            difficulty = newDifficulty;
+            
+            // Update active button styling
+            document.getElementById('easy-btn').classList.remove('active');
+            document.getElementById('medium-btn').classList.remove('active');
+            document.getElementById('hard-btn').classList.remove('active');
+            document.getElementById(`${newDifficulty}-btn`).classList.add('active');
+            
+            // Start a new game with the selected difficulty
+            initGame();
+        }
+        
+        // Event listeners
+        document.getElementById('reset-btn').addEventListener('click', initGame);
+        document.getElementById('hint-btn').addEventListener('click', provideHint);
+        document.getElementById('easy-btn').addEventListener('click', () => setDifficulty('easy'));
+        document.getElementById('medium-btn').addEventListener('click', () => setDifficulty('medium'));
+        document.getElementById('hard-btn').addEventListener('click', () => setDifficulty('hard'));
+        
+        // Initialize the game when the page loads
+        window.addEventListener('DOMContentLoaded', initGame);
+    </script>
+</body>
+</html>
